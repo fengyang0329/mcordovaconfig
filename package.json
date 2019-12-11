@@ -1,0 +1,25 @@
+{
+    "author": "mic_mobile",
+    "cordova": {
+        "id": "com.mysoft.mcordovaconfig",
+        "platforms": [
+            "ios"
+        ]
+    },
+    "description": "自定义cordova config",
+    "homepage": "https://gitlab.mypaas.com.cn/appcloud/plugins/mcordovaconfig.git#readme",
+    "keywords": [
+        "cordova",
+        "cordova-plugin",
+        "webview",
+        "ecosystem:cordova",
+        "cordova-android",
+        "cordova-ios"
+    ],
+    "name": "MCordovaConfig",
+    "repository": {
+        "type": "git",
+        "url": "https://gitlab.mypaas.com.cn/appcloud/plugins/mcordovaconfig.git"
+    },
+    "version": "1.0.0"
+}
