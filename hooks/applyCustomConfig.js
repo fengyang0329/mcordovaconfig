@@ -414,7 +414,6 @@ var applyCustomConfig = (function () {
 
             console.log(targetFilePath);
             var podfilePath = path.join(targetFilePath, "Podfile");
-            console.log('**********:', podfilePath);
             if (!fileUtils.fileExists(podfilePath)) {
 
                 console.log("没有Podfile文件，执行pod init");
@@ -884,7 +883,13 @@ var applyCustomConfig = (function () {
 // Main
 module.exports = function (ctx) {
 
+    if (ctx.opts.cordova.platforms[0].indexOf('ios') < 0) {
+
+        console.log("*************此js仅支持iOS平台*************");
+        return;
+    }
     try {
+
         deferral = require('q').defer();
         path = require('path');
         cwd = path.resolve();
