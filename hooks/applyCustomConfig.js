@@ -839,9 +839,10 @@ var applyCustomConfig = (function () {
                 key != "CFBundleInfoDictionaryVersion" &&
                 key != "CFBundleName" &&
                 key != "CFBundlePackageType" &&
+                key != "CFBundleShortVersionString" &&
                 key != "CFBundleSignature" &&
                 key != "CFBundleVersion" &&
-                key != "NSPrincipalClass") {
+                key != "NSPrincipalClass" && value != null && value != undefined && value != "") {
                 infoPlist[key] = value;
             }
         });
