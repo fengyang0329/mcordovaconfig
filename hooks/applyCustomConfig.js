@@ -175,7 +175,7 @@ var applyCustomConfig = (function () {
         //image asset catalogs using <custom-resource> elements
         // parseResources(configData, platform);
         //using <custom-pods> 
-        parseiOSPods(configData);
+        // parseiOSPods(configData);
 
         return configData;
     }
@@ -810,13 +810,50 @@ var applyCustomConfig = (function () {
                     deployAssetCatalog(targetName, targetDirPath, configItems);
                 } else if (targetName.indexOf("CocoaPods") > -1) {
 
-                    updateiOSPodFile(platformPath, projectName, configItems);
+                    // updateiOSPodFile(platformPath, projectName, configItems);
                 }
             });
+
+               copyPodPlistToTargetPlist(platformPath,projectName);
         }
+
+
+    function copyPodPlistToTargetPlist (platformPath,projectName){
+
+        var targetInfoPlistPath = path.join(platformPath, projectName, projectName+'-Info.plist');
+        var podInfoPlistPath =  path.join(platformPath, "Pods/Target Support Files/Pods-"+projectName,'Pods-'+projectName+'-Info.plist');         
+        if (!fileUtils.fileExists(podInfoPlistPath)) {
+
+            logger.debug('***********Pod Info plist 文件不存在***********');
+            return;
+        }
+        var infoPlist = plist.parse(fs.readFileSync(targetInfoPlistPath, 'utf-8'));
+        var podInfoPlist = plist.parse(fs.readFileSync(podInfoPlistPath, 'utf-8'));
+        // console.log ("*********infoPlist**********",infoPlist);
+        // console.log("*********podInfoPlist**********",podInfoPlist);
+        _.each(podInfoPlist,function(value,key){
+
+            if (key != "CFBundleDevelopmentRegion" &&
+                key != "CFBundleExecutable" &&
+                key != "CFBundleIdentifier" &&
+                key != "CFBundleInfoDictionaryVersion" &&
+                key != "CFBundleName" &&
+                key != "CFBundlePackageType" &&
+                key != "CFBundleSignature" &&
+                key != "CFBundleVersion" &&
+                key != "NSPrincipalClass") {
+                infoPlist[key] = value;
+            }
+        });
+        var tempInfoPlist = plist.build(infoPlist);
+        // console.log("*********tempInfoPlist**********",tempInfoPlist);
+        tempInfoPlist = tempInfoPlist.replace(/<string>[\s\r\n]*<\/string>/g, '<string></string>');
+        fs.writeFileSync(targetInfoPlistPath, tempInfoPlist, 'utf-8');
+    }
         /**
          * Script operations are complete, so resolve deferred promises
          */
+    
 
     function complete() {
         logger.verbose("Finished applying platform config");
