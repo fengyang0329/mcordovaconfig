@@ -18,21 +18,24 @@ Custom xcode config for  Cordova iOS
 ### 插件自定义配置方式
 > 1. 在工程路径下的config.xml的`<platform name="ios">`中写入配置参数,这样在插件被添加的时候会自动写入项目Staging虚拟目录下的config.xml文件；例如： 
 ```
-<custom-pods name="SAMKeychain" spec="~>1.5.3"/>
+<custom-preference name="XCBuildConfiguration-IPHONEOS_DEPLOYMENT_TARGET" value="9.1"/>
 ```
 
 > 2. 在插件plugin.xml的`<platform name="ios">`中写入配置参数，所有的配置都包含在Cordova官方节点`config-file`中,`target`指向`config.xml`,这样在插件被添加的时候会自动写入项目Staging虚拟目录下的config.xml文件，例如：
 >
 ```
  <config-file parent="/*" target="config.xml">
- 	 //<custom-pods name="SAMKeychain" spec="~>1.5.3"/>
+ 	<custom-preference name="XCBuildConfiguration-IPHONEOS_DEPLOYMENT_TARGET" value="9.1"/>
   </config-file>
 ```
 
+
 1. [使用`<custom-preference>`修改build settings](#custom-preference)
-2. 使用`<custom-pods>`去引用Cocoapods管理库
-2. [使用`custom-config-file`修改项目plist(*-Info.plist)](#)
-3. 使用`<custom-resource>`去引入图片资源
+
+2. [使用`custom-config-file`修改项目plist(*-Info.plist)](#custom-config-file)
+
+3. [使用`<custom-resource>`去引入图片资源](#custom-resource)
+
 4. [调用示例](#调用示例)
 
 
@@ -40,19 +43,45 @@ Custom xcode config for  Cordova iOS
 
 * 插件当前支持
 	* 通过`XCBuildConfiguration`块键去修改`project.pbxproj`文件
-	* `xcodefunc`是[node-xcode](https://github.com/alunny/node-xcode)提供的接口
+	* `xcodefunc`：通过[node-xcode](https://github.com/alunny/node-xcode)提供的接口
 	
 #### XCBuildConfiguration
-* `XCBuildConfiguration `是`<custom-preference>`目前唯一支持的块类型，用于修改`platforms/ios/{PROJECT_NAME}/{PROJECT_NAME}.xcodeproj/project.pbxproj`
+* `XCBuildConfiguration `是`<custom-preference>`目前唯一支持的块类型，用于修改`platforms/ios/{PROJECT_NAME}/{PROJECT_NAME}.xcodeproj/project.pbxproj`；
+
+* `<custom-preference>`元素属性`name`必须以`XCBuildConfiguration-`作为前缀；<br>例如： `<custom-preference name="XCBuildConfiguration-IPHONEOS_DEPLOYMENT_TARGET" value="7.0"/>`
 
 * 如果在`XCBuildConfiguration`块中指定的键值没有存在，则会新增一个
 
-* 如果在`XCBuildConfiguration`块中指定的键值已经存在，如果value是数组，则会追加进数组，否则直接覆盖；
+* 如果在`XCBuildConfiguration`块中指定的键值已经存在，则会直接覆盖；
 
-* 默认，value会同时作用于`Debug`与`Release`模式，可通过`buildType`去指定模式；例如：
+* 当`Build Settings`中键值的value是`Multiple values`这种多选类型时，可通过在`<custom-preference>`元素上添加属性`mode="merge"`，不会直接覆盖，会追加一个新值进末尾；
+
+* 可通过在`<custom-preference>`元素上添加属性`quote`给键值和value添加双引号`""`；键值key=`GCC_NEW_KEY`,value=`10.0`,在 `project.pbxproj`中的表现如下：
+	* quote可选值：
+		* none :  key 和 value都不会添加双引号；默认为none;<br>表现为：`GCC_NEW_KEY = 10.0`
+		* key : 只对key添加双引号；<br>表现为：`"GCC_NEW_KEY" = 10.0`
+		* value : 只对value添加双引号；<br>表现为：`GCC_NEW_KEY = "10.0"`
+		* both : key和value都添加双引号；<br>表现为：`"GCC_NEW_KEY" = "10.0"`
+
+* 默认，会同时作用于`debug`与`release`构建模式，可通过`<custom-preference>`元素属性`buildType`指定构建模式；例如：
 	* `<custom-preference name="XCBuildConfiguration-IPHONEOS_DEPLOYMENT_TARGET" value="7.0" buildType="release" />`
-	* 解析后在`project.pbxproj`文件中表现为：`"IPHONEOS_DEPLOYMENT_TARGET" = "7.0"`
 
+#### .xcconfig 
+
+* Cordova 通过`/platforms/ios/cordova/`目录下的`.xcconfig`文件覆盖Xcode项目`project.pbxproj`里的设置；
+	* `build.xcconfig`里的设置会在对应的构建模式下被`build-debug.xcconfig`和 `build-release.xcconfig`里的配置覆盖；
+
+* 如果`buildType`为`"debug"`或者`"realease"`,插件将分别在`build-debug.xcconfig`或`build-release.xcconfig`查找；
+
+* 如果`buildType`没有指定，或设置成`none`,插件将会在`build.xcconfig`中查找对应配置参数；
+
+* 如果在对应的`.xcconfig`文件中找到了与Staging虚拟目录下`config.xml`中`<custom-preference>`属性`name`对应的键值，其value将会被属性`name`里的`value`替代；
+
+* 如果`<custom-preference>`属性`name`键值在对应的`.xcconfig`文件中没有找到，可通过`xcconfigEnforce="true"`元素进行新增；
+
+* 当`.xcconfig`中键值的value是`Multiple values`这种多选类型时，可通过在`<custom-preference>`元素上添加属性`mode="merge"`，不会直接覆盖，会追加一个新值进末尾；
+	* 例如：`GCC_PREPROCESSOR_DEFINITIONS = DEBUG=1`
+	* 追加`value="DEFINITIONS_TEST"`后变成：`GCC_PREPROCESSOR_DEFINITIONS = DEBUG=1 DEFINITIONS_TES`
 
 
 #### <a name="调用示例"></a>调用示例
@@ -60,25 +89,23 @@ Custom xcode config for  Cordova iOS
 config.xml
 
 ```
-<custom-pods name="SAMKeychain" spec="~>1.5.3"/>
-<custom-preference name="XCBuildConfiguration-IPHONEOS_DEPLOYMENT_TARGET" value="7.0" buildType="release" />
+<custom-preference name="XCBuildConfiguration-IPHONEOS_DEPLOYMENT_TARGET" value="7.0" />
+
+<custom-preference name="XCBuildConfiguration-GCC_PREPROCESSOR_DEFINITIONS" value="DEFINITIONS_TES" buildType="debug" mode="merge" quote="value"/>
 
 ```
 
 plugin.xml
 
 ```
-<config-file parent="/*" target="config.xml">
- 	 <custom-pods name="SAMKeychain" spec="~>1.5.3"/>
-</config-file>
 
 <config-file parent="/*" target="config.xml">
  	 <custom-preference name="XCBuildConfiguration-IPHONEOS_DEPLOYMENT_TARGET" value="7.0" buildType="release" />
 </config-file>
 
 <config-file parent="/*" target="config.xml">
- 	 <custom-pods name="SAMKeychain" spec="~>1.5.3"/>
  	 <custom-preference name="XCBuildConfiguration-IPHONEOS_DEPLOYMENT_TARGET" value="7.0" buildType="release" />
+ 	 <custom-preference name="XCBuildConfiguration-GCC_PREPROCESSOR_DEFINITIONS" value="DEFINITIONS_TES" buildType="debug" mode="merge" xcconfigEnforce="true"/>
 </config-file>
 
 ```

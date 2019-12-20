@@ -103,25 +103,6 @@ var applyCustomConfig = (function () {
         return resources[platform];
     }
 
-    // function getPlatformPods(){
-
-    //     if (!pods) {
-    //           pods = getElements('pods');
-    //     }
-    //     console.log('******',pods);
-    //     // //公用部分
-    //     // var prefs = pods.common || [];
-    //     // //专属平台部分
-    //     // if(platform) {
-    //     //     if(!pods[platform]) {
-
-    //     //         pods[platform] = getElements('pods','platform[@name=\'' + platform + '\']/');
-    //     //     }
-    //     //     prefs = prefs.concat(pods[platform]);
-    //     // }
-    //     return pods;
-    // }
-
     /**
      * Implementation of _.keyBy so old versions of lodash (<2.0.0) don't cause issues
      */
@@ -166,10 +147,10 @@ var applyCustomConfig = (function () {
      * @param platform
      * @returns {{}}
      */
-    function parseiOSConfigXml() {
+    function parseiOSConfigXml(platformPath) {
         var configData = {};
         //build settings using <custom-preference> elements
-        parseiOSPreferences(configData);
+        parseiOSPreferences(configData, platformPath);
         //the project plist (*-Info.plist) using <custom-config-file> blocks
         // parseConfigFiles(configData, platform);
         //image asset catalogs using <custom-resource> elements
@@ -209,7 +190,8 @@ var applyCustomConfig = (function () {
      * @param preferences
      * @param configData
      */
-    function parseiOSPreferences(configData) {
+
+    function parseiOSPreferences(configData, platformPath) {
 
         var preferences = getElements('preference');
         var hasPbxProjPrefs = false;
@@ -220,64 +202,95 @@ var applyCustomConfig = (function () {
             var parts = preference.attrib.name.split("-"),
                 target = "project.pbxproj",
                 prefData = {
-                    type: parts[1], //e.g:XCBuildConfiguration
-                    name: parts[2], //e.g:IPHONEOS_DEPLOYMENT_TARGET
-                    value: preference.attrib.value //e.g:8.0
+                    type: parts[0], //e.g:XCBuildConfiguration
+                    name: parts[1], //e.g:IPHONEOS_DEPLOYMENT_TARGET
+                    value: preference.attrib.value, //e.g:8.0
+                    mode: preference.attrib.mode
                 };
             if (preference.attrib.buildType) {
                 prefData["buildType"] = preference.attrib.buildType;
             }
             if (preference.attrib.quote) {
                 prefData["quote"] = preference.attrib.quote;
+            } else {
+                prefData["quote"] = "none";
             }
-            //e.g:func="addResourceFile"
-            if (preference.attrib.func) {
-                prefData["func"] = preference.attrib.func;
-                prefData["args"] = [];
-                _.each(preference.getchildren(), function (arg) {
-                    if (arg.tag === "arg") {
-                        var value;
-                        switch (arg.attrib.type) {
-                        case "Null":
-                            value = null;
-                            break;
-                        case "Undefined":
-                            value = undefined;
-                            break;
-                        case "Object":
-                            value = JSON.parse(arg.attrib.value);
-                            break;
-                        case "Number":
-                            value = Number(arg.attrib.value);
-                            break;
-                        case "String":
-                            value = String(arg.attrib.value);
-                            break;
-                        case "Symbol":
-                            value = Symbol(arg.attrib.value);
-                            break;
-                        default:
-                            value = arg.attrib.value;
-                            break;
-                        }
-                        if (arg.attrib.flag !== undefined) {
-                            switch (arg.attrib.flag) {
-                            case "path":
-                                value = path.isAbsolute(value) ? value : path.join("../../", value);
-                                break;
-                            }
-                        }
-                        prefData["args"].push(value);
-                    }
-                });
-            }
-
-            prefData["xcconfigEnforce"] = preference.attrib.xcconfigEnforce ? preference.attrib.xcconfigEnforce : null;
-
             if (!configData[target]) {
                 configData[target] = [];
             }
-            configData[target].push(prefData);
+            //e.g:func="addResourceFile",目前仅支持addResourceFile
+            if (preference.attrib.func) {
+                prefData["func"] = preference.attrib.func;
+                prefData["args"] = [];
+                var targetResourcesPath = path.join(platformPath, projectName, "Resources");
+                _.each(preference.getchildren(), function (arg) {
+                    if (arg.tag === "arg") {
+
+                        var isAppIcon = arg.attrib.type == "appIcon" ? true : false;
+                        var iconTarget = "app_icon";
+                        if (isAppIcon) {
+
+                            if (!configData[iconTarget]) {
+                                configData[iconTarget] = [];
+                            }
+                        }
+                        var value = String(arg.attrib.value);
+                        var originPath = path.join(rootdir, value);
+                        if (fs.existsSync(originPath)) {
+
+
+                            var tempstats = fs.statSync(originPath);
+                            if (tempstats.isDirectory()) {
+
+                                //如果是目录，遍历目录里面的内容
+                                var resList = fs.readdirSync(originPath);
+                                resList.forEach(function (item) {
+
+                                    var itemPath = path.join(originPath, item);
+                                    var ext = path.extname(itemPath);
+                                    if (ext == ".png" || ext == ".jpg") {
+
+                                        var name = path.basename(item, ext);
+                                        // 拷贝文件
+                                        var readStream = fs.createReadStream(itemPath);
+                                        var writeStream = fs.createWriteStream(path.join(targetResourcesPath, item));
+                                        readStream.pipe(writeStream);
+
+                                        addFileData = {
+                                            type: parts[0],
+                                            func: preference.attrib.func,
+                                            args: [path.join("Resources", item)]
+                                        };
+                                        configData[target].push(addFileData);
+                                        if (isAppIcon) {
+                                            configData[iconTarget].push(item);
+                                        }
+
+                                    }
+                                });
+                            } else if (tempstats.isFile()) {
+
+                                var filename = path.basename(originPath);
+                                var fileTargetPath = path.join(targetResourcesPath, filename);
+                                var readStream = fs.createReadStream(originPath);
+                                var writeStream = fs.createWriteStream(fileTargetPath);
+                                readStream.pipe(writeStream);
+                                prefData["args"].push(path.join("Resources", filename));
+                                configData[target].push(prefData);
+                                if (isAppIcon) {
+
+                                    configData[iconTarget].push(item);
+                                }
+
+                            }
+                        }
+                    }
+                });
+            } else {
+
+                prefData["xcconfigEnforce"] = preference.attrib.xcconfigEnforce ? preference.attrib.xcconfigEnforce : null;
+                configData[target].push(prefData);
+            }
 
         });
         if (hasPbxProjPrefs) {
@@ -445,7 +458,6 @@ var applyCustomConfig = (function () {
 
                     content = insertAtIndex(content, appendedString + '\n', endIndex);
                 }
-                console.log('Podfile content:\n', content);
                 fs.writeFile(podfilePath, content, function (err) {
                     if (err) {
                         console.log(err);
@@ -540,6 +552,7 @@ var applyCustomConfig = (function () {
                     logger.error(msg + ' - Maybe you forgot to remove/add the ios platform?');
                 }
             } else {
+
                 _.each(configItems, function (item) {
                     switch (item.type) {
                     case "XCBuildConfiguration":
@@ -550,7 +563,10 @@ var applyCustomConfig = (function () {
                         }
                         break;
                     case "xcodefunc":
-                        if (typeof (xcodeProject[item.func]) === "function") {
+
+                        if (typeof (xcodeProject[item.func]) === "function" && item.args[0] != undefined) {
+
+                            xcodeProject["removeResourceFile"].apply(xcodeProject, item.args);
                             xcodeProject[item.func].apply(xcodeProject, item.args);
                         }
                         break;
@@ -580,7 +596,6 @@ var applyCustomConfig = (function () {
             var literalMatch = !!block["buildSettings"][item.name],
                 quotedMatch = !!block["buildSettings"][quoteEscape(item.name)],
                 match = literalMatch || quotedMatch;
-
             if ((match || mode === "add") &&
                 (!item.buildType || item.buildType.toLowerCase() === block['name'].toLowerCase())) {
 
@@ -592,10 +607,26 @@ var applyCustomConfig = (function () {
                     name = (item.quote && (item.quote === "none" || item.quote === "value")) ? item.name : quoteEscape(item.name);
                 }
                 var value = (item.quote && (item.quote === "none" || item.quote === "key")) ? item.value : quoteEscape(item.value);
+                var mode = item.mode;
+                if (mode == "merge") {
 
-                block["buildSettings"][name] = value;
+                    var settings = block["buildSettings"][name];
+                    if (Array.isArray(settings) && (settings.includes(item.value) || settings.includes(quoteEscape(item.value)))) {
+
+                        logger.debug("XCBuildConfiguration " + name + "= " + settings + ",已经存在value：" + value + " ,不需要重复添加!");
+                        continue;
+                    }
+                    var valuesArray = new Array(value);
+                    if (block["buildSettings"][name] != undefined) {
+                        valuesArray = valuesArray.concat(block["buildSettings"][name]);
+                    }
+                    block["buildSettings"][name] = valuesArray;
+                } else {
+
+                    block["buildSettings"][name] = value;
+                    logger.verbose(mode + " XCBuildConfiguration key={ " + name + " } to value={ " + value + " } for build type='" + block['name'] + "' in block='" + blockName + "'");
+                }
                 modified = true;
-                logger.verbose(mode + " XCBuildConfiguration key={ " + name + " } to value={ " + value + " } for build type='" + block['name'] + "' in block='" + blockName + "'");
             }
         }
         return modified;
@@ -605,6 +636,7 @@ var applyCustomConfig = (function () {
      * Checks if Cordova's .xcconfig files contain overrides for the given setting, and if so overwrites the value in the .xcconfig file(s).
      */
     function updateXCConfigs(configItems, platformPath) {
+
         xcconfigs.forEach(function (fileName) {
             updateXCConfig(platformPath, fileName, configItems);
         });
@@ -630,16 +662,25 @@ var applyCustomConfig = (function () {
                 }
 
                 var itemBuildType = item.buildType ? item.buildType.toLowerCase() : "none";
-
                 var name = item.name;
                 var value = item.value;
-
                 var doReplace = function () {
+
+                    var oldValue = null;
+                    if (item.mode == "merge") {
+
+                        oldValue = fileContents.match("\n\"?" + escapedName + "\"?.*")[0];
+                    }
+                    if (oldValue != null) {
+
+                        value = oldValue + " " + value;
+                    } else {
+                        value = "\n" + name + " = " + value;
+                    }
                     fileContents = fileContents.replace(new RegExp("\n\"?" + escapedName + "\"?.*"), "\n" + name + " = " + value);
                     logger.verbose("Overwrote " + item.name + " with '" + item.value + "' in " + targetFileName);
                     modified = true;
                 };
-
                 // If item's target build type matches the xcconfig build type
                 if (itemBuildType === fileBuildType) {
                     // If config.xml contains any #include statements for use in .xcconfig files
@@ -647,11 +688,13 @@ var applyCustomConfig = (function () {
                         fileContents += '\n#include "' + value + '"';
                         modified = true;
                     } else {
+
                         // If file contains the item, replace it with configured value
                         if (fileContents.match(escapedName) && item.xcconfigEnforce !== "false") {
                             doReplace();
                         } else // presence of item is being enforced, so add it to the relevant .xcconfig
                         if (item.xcconfigEnforce === "true") {
+
                             fileContents += "\n" + name + " = " + value;
                             modified = true;
                         }
@@ -660,11 +703,11 @@ var applyCustomConfig = (function () {
                 // if item is a Debug CODE_SIGNING_IDENTITY, this is a special case: Cordova places its default Debug CODE_SIGNING_IDENTITY in build.xcconfig (not build-debug.xcconfig)
                 // so if buildType="debug", want to overrwrite in build.xcconfig
                 if (item.name.match("CODE_SIGN_IDENTITY") && itemBuildType === "debug" && fileBuildType === "none" && !item.xcconfigEnforce) {
+
                     doReplace();
                 }
             }
         });
-
         if (modified) {
             ensureBackup(targetFilePath, 'ios', targetFileName);
             fs.writeFileSync(targetFilePath, fileContents, 'utf-8');
@@ -738,23 +781,20 @@ var applyCustomConfig = (function () {
 
     //备份
     function ensureBackup(targetFilePath, platform, targetFileName) {
+
         var backupDirPath = path.join(plugindir, "backup"),
             backupPlatformPath = path.join(backupDirPath, platform),
             backupFilePath = path.join(backupPlatformPath, targetFileName);
-
-
         var backupDirExists = fileUtils.directoryExists(backupDirPath);
         if (!backupDirExists) {
             fileUtils.createDirectory(backupDirPath);
             logger.verbose("Created backup directory: " + backupDirPath);
         }
-
         var backupPlatformExists = fileUtils.directoryExists(backupPlatformPath);
         if (!backupPlatformExists) {
             fileUtils.createDirectory(backupPlatformPath);
             logger.verbose("Created backup platform directory: " + backupPlatformPath);
         }
-
         var backupFileExists = fileUtils.fileExists(backupFilePath);
         if (!backupFileExists) {
             fileUtils.copySync(targetFilePath, backupFilePath);
@@ -775,86 +815,110 @@ var applyCustomConfig = (function () {
      */
     function updateiOSPlatformConfig() {
 
-            var configData = parseiOSConfigXml(),
-                platform = 'ios',
-                platformPath = path.join(rootdir, 'platforms', platform);
-            console.log("获取到的所有自定义配置:", configData);
-            _.each(configData, function (configItems, targetName) {
-                var targetFilePath;
-                if (targetName.indexOf("Info.plist") > -1) {
-                    targetName = projectName + '-Info.plist';
-                    targetFilePath = path.join(platformPath, projectName, targetName);
-                    ensureBackup(targetFilePath, platform, targetName);
-                    updateIosPlist(targetFilePath, configItems);
-                } else if (targetName === "project.pbxproj") {
-                    targetFilePath = path.join(platformPath, projectName + '.xcodeproj', targetName);
-                    ensureBackup(targetFilePath, platform, targetName);
-                    updateIosPbxProj(targetFilePath, configItems);
-                    updateXCConfigs(configItems, platformPath);
-                } else if (targetName.indexOf("Entitlements-Release.plist") > -1) {
-                    targetFilePath = path.join(platformPath, projectName, targetName);
-                    ensureBackup(targetFilePath, platform, targetName);
-                    updateIosPlist(targetFilePath, configItems);
-                } else if (targetName.indexOf("Entitlements-Debug.plist") > -1) {
-                    targetFilePath = path.join(platformPath, projectName, targetName);
-                    ensureBackup(targetFilePath, platform, targetName);
-                    updateIosPlist(targetFilePath, configItems);
-                } else if (targetName.indexOf("Prefix.pch") > -1) {
-                    targetName = projectName + '-Prefix.pch';
-                    targetFilePath = path.join(platformPath, projectName, targetName);
-                    ensureBackup(targetFilePath, platform, targetName);
-                    updateIosPch(targetFilePath, configItems);
-                } else if (targetName.indexOf("asset_catalog") > -1) {
-                    targetName = targetName.split('.')[1];
-                    var targetDirPath = path.join(platformPath, projectName, "Images.xcassets", targetName + ".imageset");
-                    deployAssetCatalog(targetName, targetDirPath, configItems);
-                } else if (targetName.indexOf("CocoaPods") > -1) {
+        var platform = 'ios',
+            platformPath = path.join(rootdir, 'platforms', platform);
+        var configData = parseiOSConfigXml(platformPath);
 
-                    // updateiOSPodFile(platformPath, projectName, configItems);
-                }
-            });
+        console.log("获取到的所有自定义配置:", configData);
+        _.each(configData, function (configItems, targetName) {
+            var targetFilePath;
+            if (targetName.indexOf("Info.plist") > -1) {
+                targetName = projectName + '-Info.plist';
+                targetFilePath = path.join(platformPath, projectName, targetName);
+                ensureBackup(targetFilePath, platform, targetName);
+                updateIosPlist(targetFilePath, configItems);
+            } else if (targetName === "project.pbxproj") {
+                targetFilePath = path.join(platformPath, projectName + '.xcodeproj', targetName);
+                ensureBackup(targetFilePath, platform, targetName);
+                updateIosPbxProj(targetFilePath, configItems);
+                updateXCConfigs(configItems, platformPath);
+            } else if (targetName.indexOf("Entitlements-Release.plist") > -1) {
+                targetFilePath = path.join(platformPath, projectName, targetName);
+                ensureBackup(targetFilePath, platform, targetName);
+                updateIosPlist(targetFilePath, configItems);
+            } else if (targetName.indexOf("Entitlements-Debug.plist") > -1) {
+                targetFilePath = path.join(platformPath, projectName, targetName);
+                ensureBackup(targetFilePath, platform, targetName);
+                updateIosPlist(targetFilePath, configItems);
+            } else if (targetName.indexOf("Prefix.pch") > -1) {
+                targetName = projectName + '-Prefix.pch';
+                targetFilePath = path.join(platformPath, projectName, targetName);
+                ensureBackup(targetFilePath, platform, targetName);
+                updateIosPch(targetFilePath, configItems);
+            } else if (targetName.indexOf("asset_catalog") > -1) {
+                targetName = targetName.split('.')[1];
+                var targetDirPath = path.join(platformPath, projectName, "Images.xcassets", targetName + ".imageset");
+                deployAssetCatalog(targetName, targetDirPath, configItems);
+            } else if (targetName.indexOf("app_icon") > -1) {
 
-               copyPodPlistToTargetPlist(platformPath,projectName);
-        }
-
-
-    function copyPodPlistToTargetPlist (platformPath,projectName){
-
-        var targetInfoPlistPath = path.join(platformPath, projectName, projectName+'-Info.plist');
-        var podInfoPlistPath =  path.join(platformPath, "Pods/Target Support Files/Pods-"+projectName,'Pods-'+projectName+'-Info.plist');         
-        if (!fileUtils.fileExists(podInfoPlistPath)) {
-
-            logger.debug('***********Pod Info plist 文件不存在***********');
-            return;
-        }
-        var infoPlist = plist.parse(fs.readFileSync(targetInfoPlistPath, 'utf-8'));
-        var podInfoPlist = plist.parse(fs.readFileSync(podInfoPlistPath, 'utf-8'));
-        // console.log ("*********infoPlist**********",infoPlist);
-        // console.log("*********podInfoPlist**********",podInfoPlist);
-        _.each(podInfoPlist,function(value,key){
-
-            if (key != "CFBundleDevelopmentRegion" &&
-                key != "CFBundleExecutable" &&
-                key != "CFBundleIdentifier" &&
-                key != "CFBundleInfoDictionaryVersion" &&
-                key != "CFBundleName" &&
-                key != "CFBundlePackageType" &&
-                key != "CFBundleShortVersionString" &&
-                key != "CFBundleSignature" &&
-                key != "CFBundleVersion" &&
-                key != "NSPrincipalClass" && value != null && value != undefined && value != "") {
-                infoPlist[key] = value;
+                targetName = projectName + '-Info.plist';
+                targetFilePath = path.join(platformPath, projectName, targetName);
+                //动态设置app icon图标
+                updateAlternateIcon(targetFilePath, configItems);
             }
         });
-        var tempInfoPlist = plist.build(infoPlist);
-        // console.log("*********tempInfoPlist**********",tempInfoPlist);
-        tempInfoPlist = tempInfoPlist.replace(/<string>[\s\r\n]*<\/string>/g, '<string></string>');
-        fs.writeFileSync(targetInfoPlistPath, tempInfoPlist, 'utf-8');
+
+        // 解决如果插件中有引入cocoapods，cocoapods插件添加后会马上生成一个Pod plist文件，
+        //当在插件中用<config-file>节点准备往plist中写入信息时，会写到Pod目录下的plist中，
+        // 需要拷贝Pod目录下的plist信息入plist中
+        copyPodPlistToTargetPlist(platformPath, projectName);
     }
+
+    function updateAlternateIcon(targetFilePath, configItems) {
+
+        var infoPlist = plist.parse(fs.readFileSync(targetFilePath, 'utf-8'));
+        var icons = {};
+        var bundleIcons = {};
+        configItems.forEach(function (iconName) {
+
+            var icon = {};
+            var ext = path.extname(iconName);
+            var name = path.basename(iconName, ext);
+            icon["UIPrerenderedIcon"] = "NO";
+            icon["CFBundleIconFiles"] = [name];
+            icons[name] = icon;
+        });
+        bundleIcons["CFBundleAlternateIcons"] = icons;
+        infoPlist["CFBundleIcons"] = bundleIcons;
+        var tempInfoPlist = plist.build(infoPlist);
+        tempInfoPlist = tempInfoPlist.replace(/<string>[\s\r\n]*<\/string>/g, '<string></string>');
+        fs.writeFileSync(targetFilePath, tempInfoPlist, 'utf-8');
+    }
+
+    function copyPodPlistToTargetPlist(platformPath, projectName) {
+
+            var targetInfoPlistPath = path.join(platformPath, projectName, projectName + '-Info.plist');
+            var podInfoPlistPath = path.join(platformPath, "Pods/Target Support Files/Pods-" + projectName, 'Pods-' + projectName + '-Info.plist');
+            if (!fileUtils.fileExists(podInfoPlistPath)) {
+
+                logger.debug('***********Pod Info plist 文件不存在***********');
+                return;
+            }
+            var infoPlist = plist.parse(fs.readFileSync(targetInfoPlistPath, 'utf-8'));
+            var podInfoPlist = plist.parse(fs.readFileSync(podInfoPlistPath, 'utf-8'));
+            _.each(podInfoPlist, function (value, key) {
+
+                if (key != "CFBundleDevelopmentRegion" &&
+                    key != "CFBundleExecutable" &&
+                    key != "CFBundleIdentifier" &&
+                    key != "CFBundleInfoDictionaryVersion" &&
+                    key != "CFBundleName" &&
+                    key != "CFBundlePackageType" &&
+                    key != "CFBundleShortVersionString" &&
+                    key != "CFBundleSignature" &&
+                    key != "CFBundleVersion" &&
+                    key != "NSPrincipalClass" && value != null && value != undefined && value != "") {
+                    infoPlist[key] = value;
+                }
+            });
+            var tempInfoPlist = plist.build(infoPlist);
+            tempInfoPlist = tempInfoPlist.replace(/<string>[\s\r\n]*<\/string>/g, '<string></string>');
+            fs.writeFileSync(targetInfoPlistPath, tempInfoPlist, 'utf-8');
+        }
         /**
          * Script operations are complete, so resolve deferred promises
          */
-    
+
 
     function complete() {
         logger.verbose("Finished applying platform config");
