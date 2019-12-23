@@ -874,9 +874,13 @@ var applyCustomConfig = (function () {
             var icon = {};
             var ext = path.extname(iconName);
             var name = path.basename(iconName, ext);
-            icon["UIPrerenderedIcon"] = "NO";
-            icon["CFBundleIconFiles"] = [name];
-            icons[name] = icon;
+            name = name.split("@")[0];
+            if (icons[name] == undefined) {
+
+                 icon["UIPrerenderedIcon"] = "NO";
+                 icon["CFBundleIconFiles"] = [name];
+                 icons[name] = icon;
+            }
         });
         bundleIcons["CFBundleAlternateIcons"] = icons;
         infoPlist["CFBundleIcons"] = bundleIcons;
