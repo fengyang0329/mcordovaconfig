@@ -119,12 +119,12 @@ var applyCustomConfig = (function () {
      *  element within the config.xml.  The config-file elements are then indexed by target|parent so if there are
      *  any config-file elements per platform that have the same target and parent, the last config-file element is used.
      */
-    function getConfigFilesByTargetAndParent(platform) {
-        var configFileData = getElements('config-file', 'platform[@name=\'' + platform + '\']');
+    function getConfigFilesByTargetAndParent() {
+        // var configFileData = getElements('config-file', 'platform[@name=\'' + platform + '\']');
+        var configFileData = getElements('config-file');
         var result = keyBy(configFileData, function (item) {
             var parent = item.attrib.parent;
-
-            var mode;
+            var mode, split;
             if (item.attrib.add) {
                 logger.warn("add=\"true\" is deprecated. Change to mode=\"add\".");
                 mode = "add";
@@ -132,12 +132,15 @@ var applyCustomConfig = (function () {
             if (item.attrib.mode) {
                 mode = item.attrib.mode;
             }
+            if (item.attrib.split) {
+                split = item.attrib.split;
+            }
 
             //if parent attribute is undefined /* or */, set parent to top level elementree selector
             if (!parent || parent === '/*' || parent === '*/') {
                 parent = './';
             }
-            return item.attrib.target + '|' + parent + '|' + mode;
+            return item.attrib.target + '|' + parent + '|' + mode + '|' + split;
         });
         return result;
     }
@@ -152,7 +155,7 @@ var applyCustomConfig = (function () {
         //build settings using <custom-preference> elements
         parseiOSPreferences(configData, platformPath);
         //the project plist (*-Info.plist) using <custom-config-file> blocks
-        // parseConfigFiles(configData, platform);
+        parseConfigFiles(configData, platformPath);
         //image asset catalogs using <custom-resource> elements
         // parseResources(configData, platform);
         //using <custom-pods> 
@@ -304,15 +307,15 @@ var applyCustomConfig = (function () {
      * @param configData
      * @param platform
      */
-    function parseConfigFiles(configData, platform) {
-        var configFiles = getConfigFilesByTargetAndParent(platform),
+    function parseConfigFiles(configData, platformPath) {
+        var configFiles = getConfigFilesByTargetAndParent(),
             type = 'configFile';
-
         _.each(configFiles, function (configFile, key) {
             var keyParts = key.split('|');
             var target = keyParts[0];
             var parent = keyParts[1];
             var mode = keyParts[2];
+            var split = keyParts[3];
             var items = configData[target] || [];
 
             var children = configFile.getchildren();
@@ -323,7 +326,8 @@ var applyCustomConfig = (function () {
                         type: type,
                         destination: element.tag,
                         data: element,
-                        mode: mode
+                        mode: mode,
+                        split: split
                     });
                 });
             } else {
@@ -495,12 +499,28 @@ var applyCustomConfig = (function () {
                     value = "";
                 }
             }
+            if (value.constructor == Array && item.split != null && item.split != undefined && item.split != 'undefined') {
+
+                var splitValue = [];
+
+                _.each(value, function (tmpItem) {
+
+                    if (tmpItem.constructor == String) {
+
+                        var tmp_split = tmpItem.split(item.split);
+                        splitValue = splitValue.concat(tmp_split);
+                    }
+                });
+                value = splitValue;
+            }
 
             //logger.dump(item);
             if (item.mode === 'delete') {
                 delete infoPlist[key];
             } else if (item.data.tag === "array" && infoPlist[key] && item.mode !== 'replace') {
+
                 infoPlist[key] = infoPlist[key].concat(value).filter(onlyUnique);
+
             } else {
                 infoPlist[key] = value;
             }
@@ -877,9 +897,9 @@ var applyCustomConfig = (function () {
             name = name.split("@")[0];
             if (icons[name] == undefined) {
 
-                 icon["UIPrerenderedIcon"] = "NO";
-                 icon["CFBundleIconFiles"] = [name];
-                 icons[name] = icon;
+                icon["UIPrerenderedIcon"] = "NO";
+                icon["CFBundleIconFiles"] = [name];
+                icons[name] = icon;
             }
         });
         bundleIcons["CFBundleAlternateIcons"] = icons;

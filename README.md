@@ -32,11 +32,9 @@ Custom xcode config for  Cordova iOS
 
 1. [使用`<custom-preference>`修改build settings](#custom-preference)
 
-2. [使用`custom-config-file`修改项目plist(*-Info.plist)](#custom-config-file)
+2. [使用`custom-config-file`修改项目plist(*-Info.plist、Entitlements-*.plist)](#custom-config-file)
 
-3. [使用`<custom-resource>`去引入图片资源](#custom-resource)
-
-4. [调用示例](#调用示例)
+3. [调用示例](#调用示例)
 
 
 ### <a name="custom-preference"></a>使用`<custom-preference>`修改build settings
@@ -92,30 +90,44 @@ Custom xcode config for  Cordova iOS
 	* value :  文件或者文件目录路径，文件后缀名仅支持`.jpg .png`,如：`resource/ios/appicon/image.png` or `resource/ios/appicon`
 	* type : 类型，目前仅支持`appIcon`:将图片添加进项目并引用的同时，将图片名写入`info.plist.CFBundleIcons`中，可直接调用图片名动态设置App角标.
 
+
+### <a name="custom-config-file"></a>使用`<custom-config-file>`plist(*-Info.plist、Entitlements-*.plist)
+
+调用示例:
+
+```
+<custom-config-file parent="com.apple.developer.associated-domains" split="," target="Entitlements-Debug.plist">
+    <array>
+        <string>debug_domains</string>
+    </array>
+</custom-config-file>
+<custom-config-file parent="com.apple.developer.associated-domains" split="," target="Entitlements-Release.plist">
+    <array>
+        <string>release_domains</string>
+    </array>
+</custom-config-file>
+<custom-config-file parent="appKey" target="*-Info.plist">
+    <string>123</string>
+</custom-config-file>
+<custom-config-file parent="CFBundleURLTypes" target="*-Info.plist">
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLName</key>
+            <string>MCustomUri</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>test</string>
+            </array>
+        </dict>
+    </array>
+</custom-config-file>
+
+```
+
+
 #### <a name="调用示例"></a>调用示例
-
-config.xml
-
-```
-<custom-preference name="XCBuildConfiguration-IPHONEOS_DEPLOYMENT_TARGET" value="7.0" />
-
-<custom-preference name="XCBuildConfiguration-GCC_PREPROCESSOR_DEFINITIONS" value="DEFINITIONS_TES" buildType="debug" mode="merge" quote="value" />
-
-//resource目录与platforms同级，将resource/ios/appicon文件夹里所有图片添加进工程并添加引用
-<custom-preference func="addResourceFile" name="xcodefunc">
-    <arg value="resource/ios/appicon" />
-</custom-preference>
-
-//resource目录与platforms同级，将resource/ios/appicon/image.png图片添加进工程并添加引用
-<custom-preference func="addResourceFile" name="xcodefunc">
-    <arg value="resource/ios/appicon/image.png" />
-</custom-preference>
-
-<custom-preference func="addResourceFile" name="xcodefunc">
-    <arg type="appIcon" value="resource/ios/appicon" or value="resource/ios/appicon" />
-</custom-preference>
-
-```
 
 plugin.xml
 
@@ -145,5 +157,28 @@ plugin.xml
         <arg type="appIcon" value="resource/ios/appicon" or value="resource/ios/appicon" />
     </custom-preference>
 </config-file>
+
+```
+
+config.xml
+
+```
+<custom-preference name="XCBuildConfiguration-IPHONEOS_DEPLOYMENT_TARGET" value="7.0" />
+
+<custom-preference name="XCBuildConfiguration-GCC_PREPROCESSOR_DEFINITIONS" value="DEFINITIONS_TES" buildType="debug" mode="merge" quote="value" />
+
+//resource目录与platforms同级，将resource/ios/appicon文件夹里所有图片添加进工程并添加引用
+<custom-preference func="addResourceFile" name="xcodefunc">
+    <arg value="resource/ios/appicon" />
+</custom-preference>
+
+//resource目录与platforms同级，将resource/ios/appicon/image.png图片添加进工程并添加引用
+<custom-preference func="addResourceFile" name="xcodefunc">
+    <arg value="resource/ios/appicon/image.png" />
+</custom-preference>
+
+<custom-preference func="addResourceFile" name="xcodefunc">
+    <arg type="appIcon" value="resource/ios/appicon" or value="resource/ios/appicon" />
+</custom-preference>
 
 ```
