@@ -249,7 +249,8 @@ var applyCustomConfig = (function () {
                                 var resList = fs.readdirSync(originPath);
                                 resList.forEach(function (item) {
 
-                                	var count = item.split('.');
+                                	console.log(`遍历目录找到文件：${item}`);
+                                	var count = item.split('.').length;
                                 	if (count>1) {
 
                                 		var itemPath = path.join(originPath, item);
