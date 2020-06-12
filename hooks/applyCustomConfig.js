@@ -250,8 +250,8 @@ var applyCustomConfig = (function () {
                                 resList.forEach(function (item) {
 
                                 	console.log(`遍历目录找到文件：${item}`);
-                                	var count = item.split('.').length;
-                                	if (count>1) {
+                                	var name = item.split('.')[0];
+                                	if (name != "") {
 
                                 		var itemPath = path.join(originPath, item);
                                     	// var ext = path.extname(itemPath);
