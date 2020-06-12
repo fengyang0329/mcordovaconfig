@@ -249,11 +249,11 @@ var applyCustomConfig = (function () {
                                 var resList = fs.readdirSync(originPath);
                                 resList.forEach(function (item) {
 
-                                    var itemPath = path.join(originPath, item);
-                                    var ext = path.extname(itemPath);
-                                    if (ext == ".png" || ext == ".jpg") {
+                                	if (item != ".DS_Store" && item != "." && item != "..") {
 
-                                        var name = path.basename(item, ext);
+                                		var itemPath = path.join(originPath, item);
+                                    	// var ext = path.extname(itemPath);
+                                        // var name = path.basename(item, ext);
                                         // 拷贝文件
                                         var readStream = fs.createReadStream(itemPath);
                                         var writeStream = fs.createWriteStream(path.join(targetResourcesPath, item));
@@ -269,7 +269,7 @@ var applyCustomConfig = (function () {
                                             configData[iconTarget].push(item);
                                         }
 
-                                    }
+                                	}
                                 });
                             } else if (tempstats.isFile()) {
 
