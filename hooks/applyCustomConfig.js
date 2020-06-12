@@ -249,12 +249,14 @@ var applyCustomConfig = (function () {
                                 var resList = fs.readdirSync(originPath);
                                 resList.forEach(function (item) {
 
-                                	if (item != ".DS_Store" && item != "." && item != "..") {
+                                	var count = item.split('.');
+                                	if (count>1) {
 
                                 		var itemPath = path.join(originPath, item);
                                     	// var ext = path.extname(itemPath);
                                         // var name = path.basename(item, ext);
                                         // 拷贝文件
+                                        console.log(`拷贝文件:${item}到xcode resource`);
                                         var readStream = fs.createReadStream(itemPath);
                                         var writeStream = fs.createWriteStream(path.join(targetResourcesPath, item));
                                         readStream.pipe(writeStream);
