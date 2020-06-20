@@ -122,6 +122,7 @@ var applyCustomConfig = (function () {
     function getConfigFilesByTargetAndParent() {
         // var configFileData = getElements('config-file', 'platform[@name=\'' + platform + '\']');
         var configFileData = getElements('config-file');
+        var num = 1;
         var result = keyBy(configFileData, function (item) {
             var parent = item.attrib.parent;
             var mode, split;
@@ -140,7 +141,8 @@ var applyCustomConfig = (function () {
             if (!parent || parent === '/*' || parent === '*/') {
                 parent = './';
             }
-            return item.attrib.target + '|' + parent + '|' + mode + '|' + split;
+            num++;
+            return item.attrib.target + '|' + parent + '|' + mode + '|' + split + '|' + num;
         });
         return result;
     }
