@@ -8,11 +8,15 @@
     },
     "dependencies": {
         "elementtree": "^0.1.7",
+        "fs": "0.0.1-security",
         "lodash": "^4.17.21",
         "os": "^0.1.1",
+        "path": "^0.12.7",
         "plist": "^3.0.1",
         "q": "^1.5.1",
-        "xcode": "^3.0.1"
+        "shelljs": "^0.8.4",
+        "xcode": "^3.0.1",
+        "colors": "^1.4.0"
     },
     "description": "自定义cordova config",
     "homepage": "https://gitlab.mypaas.com.cn/appcloud/plugins/mcordovaconfig.git#readme",
