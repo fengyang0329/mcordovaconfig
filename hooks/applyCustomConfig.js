@@ -966,12 +966,12 @@ var applyCustomConfig = (function () {
 
      applyCustomConfig.loadDependencies = function (ctx) {
         fs = require('fs'),
-            _ = require('../node_modules/lodash'),
-            et = require('../node_modules/elementtree'),
-            plist = require('../node_modules/plist'),
-            xcode = require('../node_modules/xcode'),
+            _ = require('lodash'),
+            et = require('elementtree'),
+            plist = require('plist'),
+            xcode = require('xcode'),
             exec = require('child_process').exec,
-            os = require('../node_modules/os')
+            os = require('os')
         fileUtils = require(path.resolve(hooksPath, "fileUtils.js"))(ctx);
         logger.verbose("Loaded module dependencies");
     };
