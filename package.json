@@ -6,6 +6,14 @@
             "ios"
         ]
     },
+    "dependencies": {
+        "elementtree": "^0.1.7",
+        "lodash": "^4.17.21",
+        "os": "^0.1.1",
+        "plist": "^3.0.1",
+        "q": "^1.5.1",
+        "xcode": "^3.0.1"
+    },
     "description": "自定义cordova config",
     "homepage": "https://gitlab.mypaas.com.cn/appcloud/plugins/mcordovaconfig.git#readme",
     "keywords": [
